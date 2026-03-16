@@ -53,15 +53,30 @@ export default function constructHook(schema: AnySchema, options?: ConstructHook
   // Failing here (at setup) is loud and early; failing per-document would be silent.
   const hooks: KareemHooks | undefined = (schema as any).s?.hooks;
 
-  schema.methods.$constructHook = async function $constructHook() {
-    if (!hooks) return;
+  schema.methods.$constructHook = function $constructHook() {
+    const p = (async () => {
+      if (!hooks) return;
 
-    const isNew = this.isNew === true;
-    if (skipNew && isNew) return;
-    if (skipInit && !isNew) return;
+      const isNew = this.isNew === true;
+      if (skipNew && isNew) return;
+      if (skipInit && !isNew) return;
 
-    await hooks.execPre("construct", this, [this]);
-    await hooks.execPost("construct", this, [this]);
+      await hooks.execPre("construct", this, [this]);
+      await hooks.execPost("construct", this, [this]);
+    })();
+
+    // Re-surface errors from async hooks so they aren't silently swallowed.
+    // Throwing inside .catch() creates another rejected Promise, so we escape
+    // back to synchronous exception territory via nextTick / setTimeout instead.
+    p.catch((err) => {
+      if (typeof process !== "undefined" && typeof process.nextTick === "function") {
+        process.nextTick(() => { throw err; });
+      } else {
+        setTimeout(() => { throw err; }, 0);
+      }
+    });
+
+    return p;
   };
   schema.queue("$constructHook", []);
 }

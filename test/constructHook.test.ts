@@ -17,6 +17,7 @@ describe("constructHook", () => {
       "TestSkipInit",
       "TestSkipInitNew",
       "TestAsync",
+      "TestHookThrows",
     ].forEach((name) => mongoose.models[name] && mongoose.deleteModel(name));
   });
   it("fires post construct when creating doc with new Model()", async () => {
@@ -173,6 +174,23 @@ describe("constructHook", () => {
     await new Promise((r) => setTimeout(r, 10)); // allow async hooks to complete
 
     expect(postCalled).toBe(true);
+  });
+
+  it("surfaces errors thrown inside a hook via process.nextTick", async () => {
+    const schema = new mongoose.Schema({ name: String });
+    schema.plugin(constructHook);
+
+    const boom = new Error("hook exploded");
+    schema.post("construct", () => { throw boom; });
+
+    const Model = mongoose.model("TestHookThrows", schema);
+
+    const caught = await new Promise<unknown>((resolve) => {
+      process.once("uncaughtException", resolve);
+      new Model({ name: "test" });
+    });
+
+    expect(caught).toBe(boom);
   });
 
   it("skipInit runs hooks for new Model()", async () => {
