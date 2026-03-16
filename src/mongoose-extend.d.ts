@@ -1,16 +1,10 @@
 /**
  * Augments Mongoose Schema to include "construct" as a valid pre/post hook name,
  * and to accept the constructHook plugin without type errors.
- * This file is automatically applied when you import from mongoose-construct-hook.
+ * This file is automatically applied when you import from mongoose-construct-plugin.
  */
-import type { PreMiddlewareFunction, PostMiddlewareFunction, Schema } from "mongoose";
-
-type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any, any>;
-
-interface ConstructHookOptions {
-  skipNew?: boolean;
-  skipInit?: boolean;
-}
+import type { PreMiddlewareFunction, PostMiddlewareFunction } from "mongoose";
+import type { AnySchema, ConstructHookOptions } from "./types";
 
 declare module "mongoose" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -28,7 +22,9 @@ declare module "mongoose" {
   > {
     pre(method: "construct", fn: PreMiddlewareFunction<THydratedDocumentType>): this;
     post(method: "construct", fn: PostMiddlewareFunction<THydratedDocumentType, THydratedDocumentType>): this;
-    /** Overload for constructHook plugin compatibility */
-    plugin(fn: (schema: AnySchema, opts?: ConstructHookOptions) => void, opts?: ConstructHookOptions): this;
+    plugin(
+      fn: (schema: AnySchema, opts?: ConstructHookOptions) => void,
+      opts?: ConstructHookOptions
+    ): this;
   }
 }

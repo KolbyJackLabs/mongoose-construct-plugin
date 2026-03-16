@@ -17,6 +17,7 @@ describe("constructHook", () => {
       "TestSkipInit",
       "TestSkipInitNew",
       "TestAsync",
+      "TestHookThrows",
     ].forEach((name) => mongoose.models[name] && mongoose.deleteModel(name));
   });
   it("fires post construct when creating doc with new Model()", async () => {
@@ -110,9 +111,9 @@ describe("constructHook", () => {
     expect(() => new Model({ name: "test" })).not.toThrow();
   });
 
-  it("skipNew skips hooks for new Model()", async () => {
+  it("only:'new' skips hooks for hydrate()", async () => {
     const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipNew: true });
+    schema.plugin(constructHook, { only: "new" });
 
     let postCalled = false;
     schema.post("construct", () => {
@@ -120,15 +121,15 @@ describe("constructHook", () => {
     });
 
     const Model = mongoose.model("TestSkipNew", schema);
-    new Model({ name: "test" });
+    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
     await new Promise((r) => setImmediate(r));
 
     expect(postCalled).toBe(false);
   });
 
-  it("skipNew runs hooks for hydrate()", async () => {
+  it("only:'new' runs hooks for new Model()", async () => {
     const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipNew: true });
+    schema.plugin(constructHook, { only: "new" });
 
     let postCalled = false;
     schema.post("construct", () => {
@@ -136,15 +137,15 @@ describe("constructHook", () => {
     });
 
     const Model = mongoose.model("TestSkipNewHydrate", schema);
-    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
+    new Model({ name: "test" });
     await new Promise((r) => setImmediate(r));
 
     expect(postCalled).toBe(true);
   });
 
-  it("skipInit skips hooks for hydrate()", async () => {
+  it("only:'hydrated' skips hooks for new Model()", async () => {
     const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipInit: true });
+    schema.plugin(constructHook, { only: "hydrated" });
 
     let postCalled = false;
     schema.post("construct", () => {
@@ -152,10 +153,26 @@ describe("constructHook", () => {
     });
 
     const Model = mongoose.model("TestSkipInit", schema);
-    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
+    new Model({ name: "test" });
     await new Promise((r) => setImmediate(r));
 
     expect(postCalled).toBe(false);
+  });
+
+  it("only:'hydrated' runs hooks for hydrate()", async () => {
+    const schema = new mongoose.Schema({ name: String });
+    schema.plugin(constructHook, { only: "hydrated" });
+
+    let postCalled = false;
+    schema.post("construct", () => {
+      postCalled = true;
+    });
+
+    const Model = mongoose.model("TestSkipInitNew", schema);
+    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
+    await new Promise((r) => setImmediate(r));
+
+    expect(postCalled).toBe(true);
   });
 
   it("supports async construct hooks", async () => {
@@ -175,19 +192,20 @@ describe("constructHook", () => {
     expect(postCalled).toBe(true);
   });
 
-  it("skipInit runs hooks for new Model()", async () => {
+  it("surfaces errors thrown inside a hook via process.nextTick", async () => {
     const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipInit: true });
+    schema.plugin(constructHook);
 
-    let postCalled = false;
-    schema.post("construct", () => {
-      postCalled = true;
+    const boom = new Error("hook exploded");
+    schema.post("construct", () => { throw boom; });
+
+    const Model = mongoose.model("TestHookThrows", schema);
+
+    const caught = await new Promise<unknown>((resolve) => {
+      process.once("uncaughtException", resolve);
+      new Model({ name: "test" });
     });
 
-    const Model = mongoose.model("TestSkipInitNew", schema);
-    new Model({ name: "test" });
-    await new Promise((r) => setImmediate(r));
-
-    expect(postCalled).toBe(true);
+    expect(caught).toBe(boom);
   });
 });

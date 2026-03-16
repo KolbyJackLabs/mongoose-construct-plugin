@@ -1,33 +1,48 @@
-import type { Schema } from "mongoose";
+import type { AnySchema, ConstructHookOptions } from "./types";
 
-/** @internal */
-export type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any, any>;
+export type { AnySchema, ConstructHookOptions } from "./types";
 
-/**
- * Options for the constructHook plugin.
- *
- * @property skipNew - When true, construct hooks do not run for documents created with `new Model()`.
- *   Use when you only want to run logic on documents loaded from the database.
- * @property skipInit - When true, construct hooks do not run for documents initialized from the database (hydrate, find, etc.).
- *   Use when you only want to run logic on newly created documents.
- */
-export interface ConstructHookOptions {
-  /** Skip hooks when `new Model()` is used. Only run on DB-loaded documents. */
-  skipNew?: boolean;
-  /** Skip hooks when document is initialized from DB (hydrate, find, etc.). Only run on `new Model()`. */
-  skipInit?: boolean;
+interface KareemHooks {
+  execPre: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown) => Promise<unknown> | void;
+  execPost: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown, callback?: unknown) => Promise<void> | void;
 }
 
-interface DocumentWithSchema {
-  $__schema?: {
-    s?: {
-      hooks?: {
-        execPre: (name: string, ctx: unknown, args: unknown[]) => Promise<unknown[]>;
-        execPost: (name: string, ctx: unknown, args: unknown[]) => Promise<void>;
-      };
-    };
-  };
-  isNew?: boolean;
+/** @internal — unified wrapper that works with both callback (M7/8) and Promise (M9) kareem */
+function execHooks(hooks: KareemHooks, ctx: unknown): Promise<void> {
+  if (hooks.execPre.constructor.name === "AsyncFunction") {
+    return (async () => {
+      await (hooks.execPre as (n: string, c: unknown, a: unknown[]) => Promise<unknown>)("construct", ctx, [ctx]);
+      await (hooks.execPost as (n: string, c: unknown, a: unknown[]) => Promise<void>)("construct", ctx, [ctx]);
+    })();
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    (hooks.execPre as (n: string, c: unknown, a: unknown[], cb: (err?: unknown) => void) => void)(
+      "construct", ctx, [ctx],
+      (preErr?: unknown) => {
+        if (preErr) return reject(preErr);
+        (hooks.execPost as (n: string, c: unknown, a: unknown[], opts: unknown, cb: (err?: unknown) => void) => void)(
+          "construct", ctx, [ctx], {},
+          (postErr?: unknown) => {
+            if (postErr) return reject(postErr);
+            resolve();
+          }
+        );
+      }
+    );
+  });
+}
+
+/**
+ * Re-surfaces a caught error outside the Promise chain so it becomes a visible
+ * uncaught exception rather than a silent unhandled rejection.
+ */
+function throwAsync(err: unknown): void {
+  if (typeof process !== "undefined" && typeof process.nextTick === "function") {
+    process.nextTick(() => { throw err; });
+  } else {
+    setTimeout(() => { throw err; }, 0);
+  }
 }
 
 /**
@@ -37,35 +52,42 @@ interface DocumentWithSchema {
  * Use schema.pre('construct', fn) and schema.post('construct', fn).
  *
  * @param schema - Mongoose schema to attach the plugin to
- * @param options - Optional configuration (skipNew, skipInit)
+ * @param options - Optional configuration
  *
  * @example
  *   schema.plugin(constructHook);
  *   schema.post('construct', function () { console.log('Constructed:', this); });
  *
  * @example
- *   schema.plugin(constructHook, { skipNew: true });
+ *   schema.plugin(constructHook, { only: 'hydrated' });
  *   schema.post('construct', function () { /* only runs when loading from DB *\/ });
  *
  * @example
- *   schema.plugin(constructHook, { skipInit: true });
+ *   schema.plugin(constructHook, { only: 'new' });
  *   schema.post('construct', function () { /* only runs for new Model() *\/ });
  */
 export default function constructHook(schema: AnySchema, options?: ConstructHookOptions): void {
-  const { skipNew = false, skipInit = false } = options ?? {};
+  const { only } = options ?? {};
 
-  schema.methods.$constructHook = async function $constructHook(this: DocumentWithSchema) {
-    const hooks = this.$__schema?.s?.hooks;
-    if (!hooks) return;
+  // Capture the hook pipeline once at registration time rather than traversing
+  // the document's private internals ($__schema.s.hooks) on every instantiation.
+  // Failing here (at setup) is loud and early; failing per-document would be silent.
+  const hooks: KareemHooks | undefined = (schema as any).s?.hooks;
 
-    const doc = this;
-    const isNew = doc.isNew === true;
+  schema.methods.$constructHook = function $constructHook() {
+    const p = (async () => {
+      if (!hooks) return;
 
-    if (skipNew && isNew) return;
-    if (skipInit && !isNew) return;
+      const isNew = this.isNew === true;
+      if (only === "new" && !isNew) return;
+      if (only === "hydrated" && isNew) return;
 
-    await hooks.execPre("construct", doc, [doc]);
-    await hooks.execPost("construct", doc, [doc]);
+      await execHooks(hooks, this);
+    })();
+
+    p.catch(throwAsync);
+
+    return p;
   };
   schema.queue("$constructHook", []);
 }
