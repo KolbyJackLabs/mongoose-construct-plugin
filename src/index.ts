@@ -1,20 +1,15 @@
 import type { AnySchema, ConstructHookOptions } from "./types";
 
 export type { AnySchema, ConstructHookOptions } from "./types";
-/** @internal */
+
 interface KareemHooks {
   execPre: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown) => Promise<unknown> | void;
   execPost: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown, callback?: unknown) => Promise<void> | void;
 }
 
-/** @internal — true when kareem uses Promise-based exec (Mongoose 9+) */
-function isPromiseBased(hooks: KareemHooks): boolean {
-  return hooks.execPre.constructor.name === "AsyncFunction";
-}
-
 /** @internal — unified wrapper that works with both callback (M7/8) and Promise (M9) kareem */
 function execHooks(hooks: KareemHooks, ctx: unknown): Promise<void> {
-  if (isPromiseBased(hooks)) {
+  if (hooks.execPre.constructor.name === "AsyncFunction") {
     return (async () => {
       await (hooks.execPre as (n: string, c: unknown, a: unknown[]) => Promise<unknown>)("construct", ctx, [ctx]);
       await (hooks.execPost as (n: string, c: unknown, a: unknown[]) => Promise<void>)("construct", ctx, [ctx]);
