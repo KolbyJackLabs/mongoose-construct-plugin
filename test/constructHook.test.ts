@@ -111,9 +111,9 @@ describe("constructHook", () => {
     expect(() => new Model({ name: "test" })).not.toThrow();
   });
 
-  it("skipNew skips hooks for new Model()", async () => {
+  it("only:'new' skips hooks for hydrate()", async () => {
     const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipNew: true });
+    schema.plugin(constructHook, { only: "new" });
 
     let postCalled = false;
     schema.post("construct", () => {
@@ -121,15 +121,15 @@ describe("constructHook", () => {
     });
 
     const Model = mongoose.model("TestSkipNew", schema);
-    new Model({ name: "test" });
+    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
     await new Promise((r) => setImmediate(r));
 
     expect(postCalled).toBe(false);
   });
 
-  it("skipNew runs hooks for hydrate()", async () => {
+  it("only:'new' runs hooks for new Model()", async () => {
     const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipNew: true });
+    schema.plugin(constructHook, { only: "new" });
 
     let postCalled = false;
     schema.post("construct", () => {
@@ -137,15 +137,15 @@ describe("constructHook", () => {
     });
 
     const Model = mongoose.model("TestSkipNewHydrate", schema);
-    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
+    new Model({ name: "test" });
     await new Promise((r) => setImmediate(r));
 
     expect(postCalled).toBe(true);
   });
 
-  it("skipInit skips hooks for hydrate()", async () => {
+  it("only:'hydrated' skips hooks for new Model()", async () => {
     const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipInit: true });
+    schema.plugin(constructHook, { only: "hydrated" });
 
     let postCalled = false;
     schema.post("construct", () => {
@@ -153,10 +153,26 @@ describe("constructHook", () => {
     });
 
     const Model = mongoose.model("TestSkipInit", schema);
-    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
+    new Model({ name: "test" });
     await new Promise((r) => setImmediate(r));
 
     expect(postCalled).toBe(false);
+  });
+
+  it("only:'hydrated' runs hooks for hydrate()", async () => {
+    const schema = new mongoose.Schema({ name: String });
+    schema.plugin(constructHook, { only: "hydrated" });
+
+    let postCalled = false;
+    schema.post("construct", () => {
+      postCalled = true;
+    });
+
+    const Model = mongoose.model("TestSkipInitNew", schema);
+    Model.hydrate({ _id: new mongoose.Types.ObjectId(), name: "hydrated" });
+    await new Promise((r) => setImmediate(r));
+
+    expect(postCalled).toBe(true);
   });
 
   it("supports async construct hooks", async () => {
@@ -191,21 +207,5 @@ describe("constructHook", () => {
     });
 
     expect(caught).toBe(boom);
-  });
-
-  it("skipInit runs hooks for new Model()", async () => {
-    const schema = new mongoose.Schema({ name: String });
-    schema.plugin(constructHook, { skipInit: true });
-
-    let postCalled = false;
-    schema.post("construct", () => {
-      postCalled = true;
-    });
-
-    const Model = mongoose.model("TestSkipInitNew", schema);
-    new Model({ name: "test" });
-    await new Promise((r) => setImmediate(r));
-
-    expect(postCalled).toBe(true);
   });
 });

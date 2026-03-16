@@ -12,16 +12,37 @@ interface KareemHooks {
 /**
  * Options for the constructHook plugin.
  *
- * @property skipNew - When true, construct hooks do not run for documents created with `new Model()`.
- *   Use when you only want to run logic on documents loaded from the database.
- * @property skipInit - When true, construct hooks do not run for documents initialized from the database (hydrate, find, etc.).
- *   Use when you only want to run logic on newly created documents.
+ * @property only - Restrict which documents trigger construct hooks.
+ *   - `"new"`: only fire for documents created with `new Model()`.
+ *   - `"hydrated"`: only fire for documents loaded from the database
+ *     (via `find`, `findOne`, `Model.hydrate`, etc.).
+ *   - Omit to fire for both (default).
+ *
+ * **"hydrated" explained:** Mongoose uses the term "hydrate" to describe
+ * the process of turning raw database data into a full Mongoose document.
+ * Any document that comes back from a query — `find()`, `findOne()`,
+ * `findById()`, `Model.hydrate()` — is a hydrated document.
  */
 export interface ConstructHookOptions {
-  /** Skip hooks when `new Model()` is used. Only run on DB-loaded documents. */
-  skipNew?: boolean;
-  /** Skip hooks when document is initialized from DB (hydrate, find, etc.). Only run on `new Model()`. */
-  skipInit?: boolean;
+  /**
+   * Restrict which document origins trigger hooks.
+   * - `"new"` — only `new Model()`
+   * - `"hydrated"` — only documents loaded from the database
+   * - omit — both (default)
+   */
+  only?: "new" | "hydrated";
+}
+
+/**
+ * Re-surfaces a caught error outside the Promise chain so it becomes a visible
+ * uncaught exception rather than a silent unhandled rejection.
+ */
+function throwAsync(err: unknown): void {
+  if (typeof process !== "undefined" && typeof process.nextTick === "function") {
+    process.nextTick(() => { throw err; });
+  } else {
+    setTimeout(() => { throw err; }, 0);
+  }
 }
 
 /**
@@ -31,22 +52,22 @@ export interface ConstructHookOptions {
  * Use schema.pre('construct', fn) and schema.post('construct', fn).
  *
  * @param schema - Mongoose schema to attach the plugin to
- * @param options - Optional configuration (skipNew, skipInit)
+ * @param options - Optional configuration
  *
  * @example
  *   schema.plugin(constructHook);
  *   schema.post('construct', function () { console.log('Constructed:', this); });
  *
  * @example
- *   schema.plugin(constructHook, { skipNew: true });
+ *   schema.plugin(constructHook, { only: 'hydrated' });
  *   schema.post('construct', function () { /* only runs when loading from DB *\/ });
  *
  * @example
- *   schema.plugin(constructHook, { skipInit: true });
+ *   schema.plugin(constructHook, { only: 'new' });
  *   schema.post('construct', function () { /* only runs for new Model() *\/ });
  */
 export default function constructHook(schema: AnySchema, options?: ConstructHookOptions): void {
-  const { skipNew = false, skipInit = false } = options ?? {};
+  const { only } = options ?? {};
 
   // Capture the hook pipeline once at registration time rather than traversing
   // the document's private internals ($__schema.s.hooks) on every instantiation.
@@ -58,23 +79,14 @@ export default function constructHook(schema: AnySchema, options?: ConstructHook
       if (!hooks) return;
 
       const isNew = this.isNew === true;
-      if (skipNew && isNew) return;
-      if (skipInit && !isNew) return;
+      if (only === "new" && !isNew) return;
+      if (only === "hydrated" && isNew) return;
 
       await hooks.execPre("construct", this, [this]);
       await hooks.execPost("construct", this, [this]);
     })();
 
-    // Re-surface errors from async hooks so they aren't silently swallowed.
-    // Throwing inside .catch() creates another rejected Promise, so we escape
-    // back to synchronous exception territory via nextTick / setTimeout instead.
-    p.catch((err) => {
-      if (typeof process !== "undefined" && typeof process.nextTick === "function") {
-        process.nextTick(() => { throw err; });
-      } else {
-        setTimeout(() => { throw err; }, 0);
-      }
-    });
+    p.catch(throwAsync);
 
     return p;
   };

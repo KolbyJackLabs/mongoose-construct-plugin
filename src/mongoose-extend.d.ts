@@ -8,8 +8,7 @@ import type { PreMiddlewareFunction, PostMiddlewareFunction, Schema } from "mong
 type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any, any>;
 
 interface ConstructHookOptions {
-  skipNew?: boolean;
-  skipInit?: boolean;
+  only?: "new" | "hydrated";
 }
 
 declare module "mongoose" {
