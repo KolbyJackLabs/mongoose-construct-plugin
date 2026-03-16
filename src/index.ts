@@ -1,8 +1,6 @@
-import type { Schema } from "mongoose";
+import type { AnySchema, ConstructHookOptions } from "./types";
 
-/** @internal */
-export type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any, any>;
-
+export type { AnySchema, ConstructHookOptions } from "./types";
 /** @internal */
 interface KareemHooks {
   execPre: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown) => Promise<unknown> | void;
@@ -38,30 +36,6 @@ function execHooks(hooks: KareemHooks, ctx: unknown): Promise<void> {
       }
     );
   });
-}
-
-/**
- * Options for the constructHook plugin.
- *
- * @property only - Restrict which documents trigger construct hooks.
- *   - `"new"`: only fire for documents created with `new Model()`.
- *   - `"hydrated"`: only fire for documents loaded from the database
- *     (via `find`, `findOne`, `Model.hydrate`, etc.).
- *   - Omit to fire for both (default).
- *
- * **"hydrated" explained:** Mongoose uses the term "hydrate" to describe
- * the process of turning raw database data into a full Mongoose document.
- * Any document that comes back from a query — `find()`, `findOne()`,
- * `findById()`, `Model.hydrate()` — is a hydrated document.
- */
-export interface ConstructHookOptions {
-  /**
-   * Restrict which document origins trigger hooks.
-   * - `"new"` — only `new Model()`
-   * - `"hydrated"` — only documents loaded from the database
-   * - omit — both (default)
-   */
-  only?: "new" | "hydrated";
 }
 
 /**

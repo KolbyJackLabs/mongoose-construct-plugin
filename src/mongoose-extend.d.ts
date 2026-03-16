@@ -4,12 +4,7 @@
  * This file is automatically applied when you import from mongoose-construct-hook.
  */
 import type { PreMiddlewareFunction, PostMiddlewareFunction, Schema } from "mongoose";
-
-type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any, any>;
-
-interface ConstructHookOptions {
-  only?: "new" | "hydrated";
-}
+import type { AnySchema, ConstructHookOptions } from "./types";
 
 declare module "mongoose" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
