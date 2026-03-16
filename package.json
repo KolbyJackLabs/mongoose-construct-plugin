@@ -1,0 +1,45 @@
+{
+  "name": "mongoose-construct-hook",
+  "version": "1.0.0",
+  "description": "Mongoose plugin: pre/post construct hooks that fire when documents are instantiated (new Model() or hydrated from DB)",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && cp src/mongoose-extend.d.ts dist/ && printf '/// <reference path=\"./mongoose-extend.d.ts\" />\\n' | cat - dist/index.d.ts > dist/index.d.ts.tmp && mv dist/index.d.ts.tmp dist/index.d.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "mongoose",
+    "plugin",
+    "hooks",
+    "construct",
+    "init"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "peerDependencies": {
+    "mongoose": "^7.0.0 || ^8.0.0 || ^9.0.0"
+  },
+  "devDependencies": {
+    "mongoose": "^9.2.4",
+    "tsup": "^8.3.5",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.6"
+  }
+}
