@@ -3,7 +3,7 @@
  * and to accept the constructHook plugin without type errors.
  * This file is automatically applied when you import from mongoose-construct-hook.
  */
-import type { PreMiddlewareFunction, PostMiddlewareFunction, Schema } from "mongoose";
+import type { PreMiddlewareFunction, PostMiddlewareFunction } from "mongoose";
 import type { AnySchema, ConstructHookOptions } from "./types";
 
 declare module "mongoose" {
@@ -22,7 +22,9 @@ declare module "mongoose" {
   > {
     pre(method: "construct", fn: PreMiddlewareFunction<THydratedDocumentType>): this;
     post(method: "construct", fn: PostMiddlewareFunction<THydratedDocumentType, THydratedDocumentType>): this;
-    /** Overload for constructHook plugin compatibility */
-    plugin(fn: (schema: AnySchema, opts?: ConstructHookOptions) => void, opts?: ConstructHookOptions): this;
+    plugin(
+      fn: (schema: AnySchema, opts?: ConstructHookOptions) => void,
+      opts?: ConstructHookOptions
+    ): this;
   }
 }
