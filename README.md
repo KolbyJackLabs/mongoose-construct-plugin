@@ -1,4 +1,4 @@
-# mongoose-construct-hook
+# mongoose-construct-plugin
 
 Mongoose plugin that adds `pre` and `post` **construct** hooks — hooks that fire every time a document is instantiated, whether created with `new Model()` or loaded from the database.
 
@@ -25,7 +25,7 @@ Supports both **sync and async** hooks.
 ## Installation
 
 ```bash
-npm install mongoose-construct-hook
+npm install mongoose-construct-plugin
 ```
 
 ---
@@ -34,7 +34,7 @@ npm install mongoose-construct-hook
 
 ```javascript
 import mongoose from "mongoose";
-import constructHook from "mongoose-construct-hook";
+import constructHook from "mongoose-construct-plugin";
 
 const schema = new mongoose.Schema({ name: String });
 schema.plugin(constructHook);
@@ -198,7 +198,7 @@ Register hooks. Both sync and async functions are supported. `this` inside the h
 ### Exported types
 
 ```typescript
-import constructHook, { type ConstructHookOptions, type AnySchema } from "mongoose-construct-hook";
+import constructHook, { type ConstructHookOptions, type AnySchema } from "mongoose-construct-plugin";
 ```
 
 - **`ConstructHookOptions`** — `{ only?: "new" | "hydrated" }`

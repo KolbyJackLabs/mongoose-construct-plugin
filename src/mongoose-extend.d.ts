@@ -1,7 +1,7 @@
 /**
  * Augments Mongoose Schema to include "construct" as a valid pre/post hook name,
  * and to accept the constructHook plugin without type errors.
- * This file is automatically applied when you import from mongoose-construct-hook.
+ * This file is automatically applied when you import from mongoose-construct-plugin.
  */
 import type { PreMiddlewareFunction, PostMiddlewareFunction } from "mongoose";
 import type { AnySchema, ConstructHookOptions } from "./types";

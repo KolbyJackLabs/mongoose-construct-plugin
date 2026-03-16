@@ -1,6 +1,6 @@
 {
-  "name": "mongoose-construct-hook",
-  "version": "1.0.0",
+  "name": "mongoose-construct-plugin",
+  "version": "0.1.0",
   "description": "Mongoose plugin: pre/post construct hooks that fire when documents are instantiated (new Model() or hydrated from DB)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -15,9 +15,11 @@
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsup && node scripts/post-build.mjs",
     "build:watch": "tsup --watch --onSuccess \"node scripts/post-build.mjs\"",
+    "prepublishOnly": "npm run build && npm test",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -32,7 +34,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/KolbyJackLabs/mongoose-construct-hook.git"
+    "url": "git+https://github.com/KolbyJackLabs/mongoose-construct-plugin.git"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "peerDependencies": {
     "mongoose": "^7.0.0 || ^8.0.0 || ^9.0.0"
