@@ -5,8 +5,39 @@ export type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any,
 
 /** @internal */
 interface KareemHooks {
-  execPre: (name: string, ctx: unknown, args: unknown[]) => Promise<unknown[]>;
-  execPost: (name: string, ctx: unknown, args: unknown[]) => Promise<void>;
+  execPre: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown) => Promise<unknown> | void;
+  execPost: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown, callback?: unknown) => Promise<void> | void;
+}
+
+/** @internal — true when kareem uses Promise-based exec (Mongoose 9+) */
+function isPromiseBased(hooks: KareemHooks): boolean {
+  return hooks.execPre.constructor.name === "AsyncFunction";
+}
+
+/** @internal — unified wrapper that works with both callback (M7/8) and Promise (M9) kareem */
+function execHooks(hooks: KareemHooks, ctx: unknown): Promise<void> {
+  if (isPromiseBased(hooks)) {
+    return (async () => {
+      await (hooks.execPre as (n: string, c: unknown, a: unknown[]) => Promise<unknown>)("construct", ctx, [ctx]);
+      await (hooks.execPost as (n: string, c: unknown, a: unknown[]) => Promise<void>)("construct", ctx, [ctx]);
+    })();
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    (hooks.execPre as (n: string, c: unknown, a: unknown[], cb: (err?: unknown) => void) => void)(
+      "construct", ctx, [ctx],
+      (preErr?: unknown) => {
+        if (preErr) return reject(preErr);
+        (hooks.execPost as (n: string, c: unknown, a: unknown[], opts: unknown, cb: (err?: unknown) => void) => void)(
+          "construct", ctx, [ctx], {},
+          (postErr?: unknown) => {
+            if (postErr) return reject(postErr);
+            resolve();
+          }
+        );
+      }
+    );
+  });
 }
 
 /**
@@ -82,8 +113,7 @@ export default function constructHook(schema: AnySchema, options?: ConstructHook
       if (only === "new" && !isNew) return;
       if (only === "hydrated" && isNew) return;
 
-      await hooks.execPre("construct", this, [this]);
-      await hooks.execPost("construct", this, [this]);
+      await execHooks(hooks, this);
     })();
 
     p.catch(throwAsync);
