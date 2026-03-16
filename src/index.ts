@@ -3,6 +3,12 @@ import type { Schema } from "mongoose";
 /** @internal */
 export type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any, any>;
 
+/** @internal */
+interface KareemHooks {
+  execPre: (name: string, ctx: unknown, args: unknown[]) => Promise<unknown[]>;
+  execPost: (name: string, ctx: unknown, args: unknown[]) => Promise<void>;
+}
+
 /**
  * Options for the constructHook plugin.
  *
@@ -16,18 +22,6 @@ export interface ConstructHookOptions {
   skipNew?: boolean;
   /** Skip hooks when document is initialized from DB (hydrate, find, etc.). Only run on `new Model()`. */
   skipInit?: boolean;
-}
-
-interface DocumentWithSchema {
-  $__schema?: {
-    s?: {
-      hooks?: {
-        execPre: (name: string, ctx: unknown, args: unknown[]) => Promise<unknown[]>;
-        execPost: (name: string, ctx: unknown, args: unknown[]) => Promise<void>;
-      };
-    };
-  };
-  isNew?: boolean;
 }
 
 /**
@@ -54,18 +48,20 @@ interface DocumentWithSchema {
 export default function constructHook(schema: AnySchema, options?: ConstructHookOptions): void {
   const { skipNew = false, skipInit = false } = options ?? {};
 
-  schema.methods.$constructHook = async function $constructHook(this: DocumentWithSchema) {
-    const hooks = this.$__schema?.s?.hooks;
+  // Capture the hook pipeline once at registration time rather than traversing
+  // the document's private internals ($__schema.s.hooks) on every instantiation.
+  // Failing here (at setup) is loud and early; failing per-document would be silent.
+  const hooks: KareemHooks | undefined = (schema as any).s?.hooks;
+
+  schema.methods.$constructHook = async function $constructHook() {
     if (!hooks) return;
 
-    const doc = this;
-    const isNew = doc.isNew === true;
-
+    const isNew = this.isNew === true;
     if (skipNew && isNew) return;
     if (skipInit && !isNew) return;
 
-    await hooks.execPre("construct", doc, [doc]);
-    await hooks.execPost("construct", doc, [doc]);
+    await hooks.execPre("construct", this, [this]);
+    await hooks.execPost("construct", this, [this]);
   };
   schema.queue("$constructHook", []);
 }
