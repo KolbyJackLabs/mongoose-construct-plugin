@@ -1,6 +1,6 @@
 {
   "name": "mongoose-construct-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Mongoose plugin: pre/post construct hooks that fire when documents are instantiated (new Model() or hydrated from DB)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -25,6 +25,9 @@
     "build": "tsup",
     "build:watch": "tsup --watch",
     "prepublishOnly": "npm run build && npm test && npm run test:types",
+    "release:major": "node scripts/release.mjs major",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:patch": "node scripts/release.mjs patch",
     "test": "vitest run",
     "test:types": "node scripts/test-types.mjs",
     "test:watch": "vitest"
