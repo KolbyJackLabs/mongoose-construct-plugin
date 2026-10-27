@@ -25,6 +25,9 @@
     "build": "tsup",
     "build:watch": "tsup --watch",
     "prepublishOnly": "npm run build && npm test && npm run test:types",
+    "release:major": "node scripts/release.mjs major",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:patch": "node scripts/release.mjs patch",
     "test": "vitest run",
     "test:types": "node scripts/test-types.mjs",
     "test:watch": "vitest"
