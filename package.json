@@ -1,15 +1,20 @@
 {
   "name": "mongoose-construct-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mongoose plugin: pre/post construct hooks that fire when documents are instantiated (new Model() or hydrated from DB)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     }
   },
   "files": [
@@ -17,10 +22,11 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsup && node scripts/post-build.mjs",
-    "build:watch": "tsup --watch --onSuccess \"node scripts/post-build.mjs\"",
-    "prepublishOnly": "npm run build && npm test",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "prepublishOnly": "npm run build && npm test && npm run test:types",
     "test": "vitest run",
+    "test:types": "node scripts/test-types.mjs",
     "test:watch": "vitest"
   },
   "keywords": [
@@ -47,6 +53,6 @@
     "mongoose": "^9.3.0",
     "tsup": "^8.3.5",
     "typescript": "^5.5.4",
-    "vitest": "^2.1.6"
+    "vitest": "^4.1.12"
   }
 }

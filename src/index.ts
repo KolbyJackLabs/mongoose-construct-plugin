@@ -1,6 +1,7 @@
-import type { AnySchema, ConstructHookOptions } from "./types";
+import type { PostMiddlewareFunction, PreMiddlewareFunction, Schema } from "mongoose";
+import type { AnySchema, ConstructHookOptions, ConstructedDocument } from "./types";
 
-export type { AnySchema, ConstructHookOptions } from "./types";
+export type { AnySchema, ConstructHookOptions, ConstructedDocument } from "./types";
 
 interface KareemHooks {
   execPre: (name: string, ctx: unknown, args: unknown[], callbackOrOptions?: unknown) => Promise<unknown> | void;
@@ -49,22 +50,22 @@ function throwAsync(err: unknown): void {
  * Mongoose plugin: construct hook.
  *
  * Fires pre/post hooks when documents are instantiated. Supports both sync and async hooks.
- * Use schema.pre('construct', fn) and schema.post('construct', fn).
+ * Register hooks with preConstruct(schema, fn) and postConstruct(schema, fn).
  *
  * @param schema - Mongoose schema to attach the plugin to
  * @param options - Optional configuration
  *
  * @example
  *   schema.plugin(constructHook);
- *   schema.post('construct', function () { console.log('Constructed:', this); });
+ *   postConstruct(schema, function (doc) { console.log('Constructed:', doc); });
  *
  * @example
  *   schema.plugin(constructHook, { only: 'hydrated' });
- *   schema.post('construct', function () { /* only runs when loading from DB *\/ });
+ *   postConstruct(schema, function () { /* only runs when loading from DB *\/ });
  *
  * @example
  *   schema.plugin(constructHook, { only: 'new' });
- *   schema.post('construct', function () { /* only runs for new Model() *\/ });
+ *   postConstruct(schema, function () { /* only runs for new Model() *\/ });
  */
 export default function constructHook(schema: AnySchema, options?: ConstructHookOptions): void {
   const { only } = options ?? {};
@@ -90,4 +91,36 @@ export default function constructHook(schema: AnySchema, options?: ConstructHook
     return p;
   };
   schema.queue("$constructHook", []);
+}
+
+/**
+ * Registers a pre "construct" hook, typed to the schema's hydrated document.
+ *
+ * Equivalent to `schema.pre("construct", fn)`. Mongoose's hook names are closed
+ * type aliases, so that call does not type-check without a cast.
+ *
+ * @returns the schema, for chaining
+ */
+export function preConstruct<S extends Schema>(
+  schema: S,
+  fn: PreMiddlewareFunction<ConstructedDocument<S>>
+): S {
+  (schema as any).pre("construct", fn);
+  return schema;
+}
+
+/**
+ * Registers a post "construct" hook, typed to the schema's hydrated document.
+ *
+ * Equivalent to `schema.post("construct", fn)`. Mongoose's hook names are closed
+ * type aliases, so that call does not type-check without a cast.
+ *
+ * @returns the schema, for chaining
+ */
+export function postConstruct<S extends Schema>(
+  schema: S,
+  fn: PostMiddlewareFunction<ConstructedDocument<S>, ConstructedDocument<S>>
+): S {
+  (schema as any).post("construct", fn);
+  return schema;
 }
