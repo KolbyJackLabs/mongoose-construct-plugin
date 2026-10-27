@@ -53,16 +53,27 @@ User.hydrate({ _id: new mongoose.Types.ObjectId(), name: "Bob" });  // loaded fr
 ### With pre and post hooks
 
 ```javascript
+import { postConstruct, preConstruct } from "mongoose-construct-plugin";
+
 preConstruct(schema, function () {
-  // Runs first; can mutate the document before it's handed to calling code
+  // Runs synchronously inside new Model() / hydration.
   this.initializedAt = new Date();
 });
 
-postConstruct(schema, function () {
-  // Runs after pre; document is fully constructed
-  Object.freeze(this.someArray);
+postConstruct(schema, function (doc) {
+  // Runs after pre. `doc` is the same document as `this`.
+  console.log("constructed", doc.name);
 });
 ```
+
+### When hooks run
+
+| | `new Model(data)` | Loaded from the database |
+| --- | --- | --- |
+| `pre` | During the constructor, after `data` is applied | During the constructor, **before** the stored values are applied: fields are still empty, and anything it sets is overwritten by the stored values |
+| `post` | Just after `new Model()` returns | Just after the document is returned, with stored values loaded |
+
+`post` hooks always run after the constructor returns, on the next microtask, even when the hook itself is synchronous. To set or read field values on database-loaded documents, use `postConstruct` (or restrict a `pre` hook to new documents with `only: "new"`).
 
 ### Async hooks
 
@@ -73,7 +84,7 @@ postConstruct(schema, async function () {
 });
 ```
 
-> **Note:** Document construction is synchronous. Async hooks run in the background — the document is returned to the caller before async hooks complete. If you need to wait for them, await the document's `.$constructHook()` method or use `setImmediate`/`setTimeout` in your own code. Errors thrown in async hooks will surface as uncaught exceptions.
+> **Note:** Document construction is synchronous, so hooks can't delay it. The document is returned to the caller before `post` hooks run and before async hooks finish, and there is no public way to wait for them. If later code depends on an async hook's result, store a promise on the document (see [use case 3](#3-lazy-load-related-data-for-db-loaded-documents-only)) and await that. Errors thrown in any construct hook, sync or async, surface as uncaught exceptions.
 
 ---
 
@@ -193,7 +204,13 @@ Attach the plugin to your schema. Must be called before `mongoose.model()`.
 
 ### `preConstruct(schema, fn)` / `postConstruct(schema, fn)`
 
-Register hooks. Both sync and async functions are supported. `this` inside the hook refers to the document being constructed.
+```typescript
+import { postConstruct, preConstruct } from "mongoose-construct-plugin";
+```
+
+Register construct hooks. Both sync and async functions are supported. `this` is the document being constructed, and `postConstruct` also passes it as the first argument. Both are typed to the schema's hydrated document and return the schema. See [When hooks run](#when-hooks-run) for timing.
+
+They register the same hooks as `schema.pre("construct", fn)` / `schema.post("construct", fn)`, which still work at runtime. Mongoose's TypeScript hook names are a closed list, so in TypeScript the raw form needs a cast (`schema.post("construct" as any, fn)`).
 
 ### Exported types
 
@@ -228,6 +245,7 @@ Plain JavaScript users don't need to change anything.
 ## Requirements
 
 - Mongoose ^7.0.0, ^8.0.0, or ^9.0.0
+- Node.js 18 or later (CI tests Node 20, 22 and 24)
 
 ## License
 
