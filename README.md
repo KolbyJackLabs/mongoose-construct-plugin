@@ -34,12 +34,12 @@ npm install mongoose-construct-plugin
 
 ```javascript
 import mongoose from "mongoose";
-import constructHook from "mongoose-construct-plugin";
+import constructHook, { postConstruct } from "mongoose-construct-plugin";
 
 const schema = new mongoose.Schema({ name: String });
 schema.plugin(constructHook);
 
-schema.post("construct", function () {
+postConstruct(schema, function () {
   console.log("Document constructed:", this.name);
 });
 
@@ -53,12 +53,12 @@ User.hydrate({ _id: new mongoose.Types.ObjectId(), name: "Bob" });  // loaded fr
 ### With pre and post hooks
 
 ```javascript
-schema.pre("construct", function () {
+preConstruct(schema, function () {
   // Runs first; can mutate the document before it's handed to calling code
   this.initializedAt = new Date();
 });
 
-schema.post("construct", function () {
+postConstruct(schema, function () {
   // Runs after pre; document is fully constructed
   Object.freeze(this.someArray);
 });
@@ -67,7 +67,7 @@ schema.post("construct", function () {
 ### Async hooks
 
 ```javascript
-schema.post("construct", async function () {
+postConstruct(schema, async function () {
   await this.populate("relatedDoc");
   this.computed = await fetchExternalData(this.id);
 });
@@ -96,7 +96,7 @@ Mongoose uses the term _hydrate_ to describe turning raw database data into a fu
 
 ```javascript
 schema.plugin(constructHook, { only: "hydrated" });
-schema.post("construct", async function () {
+postConstruct(schema, async function () {
   // Only runs when loading from DB, not on new Model()
   if (this.externalId) {
     this.externalData = await fetchFromAPI(this.externalId);
@@ -110,7 +110,7 @@ schema.post("construct", async function () {
 
 ```javascript
 schema.plugin(constructHook, { only: "new" });
-schema.post("construct", function () {
+postConstruct(schema, function () {
   // Only runs on new Model(), not when loading from DB
   this._formDirty = false;
   this._validationErrors = {};
@@ -129,7 +129,7 @@ Prevent `doc.items[0] = x` and force `doc.items.set(0, x)` for proper Mongoose c
 
 ```javascript
 schema.plugin(constructHook);
-schema.post("construct", function () {
+postConstruct(schema, function () {
   if (!this.items) return;
   const real = this.items;
   this.$set(
@@ -151,7 +151,7 @@ schema.post("construct", function () {
 
 ```javascript
 schema.plugin(constructHook, { only: "new" });
-schema.post("construct", function () {
+postConstruct(schema, function () {
   this.displayName = `${this.firstName} ${this.lastName}`.trim();
 });
 ```
@@ -160,7 +160,7 @@ schema.post("construct", function () {
 
 ```javascript
 schema.plugin(constructHook, { only: "hydrated" });
-schema.post("construct", async function () {
+postConstruct(schema, async function () {
   if (this.refId) {
     this._refPromise = ExternalModel.findById(this.refId);
   }
@@ -171,7 +171,7 @@ schema.post("construct", async function () {
 
 ```javascript
 schema.plugin(constructHook, { only: "new" });
-schema.pre("construct", function () {
+preConstruct(schema, function () {
   this.createdAt = new Date();
   this.createdBy = getCurrentUserId();
 });
@@ -191,18 +191,37 @@ Attach the plugin to your schema. Must be called before `mongoose.model()`.
 | ------ | ---- | ------- | ----------- |
 | `only` | `"new" \| "hydrated"` | _(both)_ | Restrict which document origins trigger hooks |
 
-### `schema.pre("construct", fn)` / `schema.post("construct", fn)`
+### `preConstruct(schema, fn)` / `postConstruct(schema, fn)`
 
 Register hooks. Both sync and async functions are supported. `this` inside the hook refers to the document being constructed.
 
 ### Exported types
 
 ```typescript
-import constructHook, { type ConstructHookOptions, type AnySchema } from "mongoose-construct-plugin";
+import constructHook, { type ConstructHookOptions, type ConstructedDocument, type AnySchema } from "mongoose-construct-plugin";
 ```
 
 - **`ConstructHookOptions`** — `{ only?: "new" | "hydrated" }`
-- **`AnySchema`** — Schema type alias (exported for advanced augmentation use cases)
+- **`ConstructedDocument<S>`** — the hydrated document type construct hooks on schema `S` receive
+- **`AnySchema`** — the wide Schema type the plugin accepts
+
+---
+
+## Upgrading from 0.1.x
+
+0.1.x augmented Mongoose's `Schema` interface so `schema.pre/post("construct", fn)` type-checked. On Mongoose 9 that augmentation made `model()` return `unknown` for any schema in the program, so it has been removed. Replace
+
+```typescript
+schema.post("construct", function (doc) { /* ... */ });
+```
+
+with
+
+```typescript
+postConstruct(schema, function (doc) { /* ... */ });
+```
+
+Plain JavaScript users don't need to change anything.
 
 ---
 

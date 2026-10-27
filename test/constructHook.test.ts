@@ -1,7 +1,6 @@
-/// <reference path="../src/mongoose-extend.d.ts" />
 import { describe, it, expect, afterEach } from "vitest";
 import mongoose from "mongoose";
-import constructHook from "../src/index";
+import constructHook, { postConstruct, preConstruct } from "../src/index";
 
 describe("constructHook", () => {
   afterEach(() => {
@@ -18,6 +17,8 @@ describe("constructHook", () => {
       "TestSkipInitNew",
       "TestAsync",
       "TestHookThrows",
+      "TestRawHookName",
+      "TestHelperDoc",
     ].forEach((name) => mongoose.models[name] && mongoose.deleteModel(name));
   });
   it("fires post construct when creating doc with new Model()", async () => {
@@ -25,7 +26,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook);
 
     let postCalled = false;
-    schema.post("construct", function () {
+    postConstruct(schema, function () {
       postCalled = true;
     });
 
@@ -41,7 +42,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook);
 
     let postCalled = false;
-    schema.post("construct", function () {
+    postConstruct(schema, function () {
       postCalled = true;
     });
 
@@ -57,11 +58,11 @@ describe("constructHook", () => {
     schema.plugin(constructHook);
 
     const order: string[] = [];
-    schema.pre("construct", function () {
+    preConstruct(schema, function () {
       order.push("pre");
       (this as { flag?: boolean }).flag = true;
     });
-    schema.post("construct", function () {
+    postConstruct(schema, function () {
       order.push("post");
       expect((this as { flag?: boolean }).flag).toBe(true);
     });
@@ -78,14 +79,14 @@ describe("constructHook", () => {
     const schemaA = new mongoose.Schema({ value: String });
     schemaA.plugin(constructHook);
     let calledA = false;
-    schemaA.post("construct", () => {
+    postConstruct(schemaA, () => {
       calledA = true;
     });
 
     const schemaB = new mongoose.Schema({ value: String });
     schemaB.plugin(constructHook);
     let calledB = false;
-    schemaB.post("construct", () => {
+    postConstruct(schemaB, () => {
       calledB = true;
     });
 
@@ -116,7 +117,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook, { only: "new" });
 
     let postCalled = false;
-    schema.post("construct", () => {
+    postConstruct(schema, () => {
       postCalled = true;
     });
 
@@ -132,7 +133,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook, { only: "new" });
 
     let postCalled = false;
-    schema.post("construct", () => {
+    postConstruct(schema, () => {
       postCalled = true;
     });
 
@@ -148,7 +149,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook, { only: "hydrated" });
 
     let postCalled = false;
-    schema.post("construct", () => {
+    postConstruct(schema, () => {
       postCalled = true;
     });
 
@@ -164,7 +165,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook, { only: "hydrated" });
 
     let postCalled = false;
-    schema.post("construct", () => {
+    postConstruct(schema, () => {
       postCalled = true;
     });
 
@@ -180,7 +181,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook);
 
     let postCalled = false;
-    schema.post("construct", async function () {
+    postConstruct(schema, async function () {
       await new Promise((r) => setImmediate(r));
       postCalled = true;
     });
@@ -197,7 +198,7 @@ describe("constructHook", () => {
     schema.plugin(constructHook);
 
     const boom = new Error("hook exploded");
-    schema.post("construct", () => { throw boom; });
+    postConstruct(schema, () => { throw boom; });
 
     const Model = mongoose.model("TestHookThrows", schema);
 
@@ -207,5 +208,38 @@ describe("constructHook", () => {
     });
 
     expect(caught).toBe(boom);
+  });
+
+  it("passes the constructed document to postConstruct and returns the schema", async () => {
+    const schema = new mongoose.Schema({ name: String });
+    schema.plugin(constructHook);
+
+    let seen: string | null | undefined;
+    const returned = postConstruct(schema, function (doc) {
+      seen = doc.name;
+    });
+
+    const Model = mongoose.model("TestHelperDoc", schema);
+    new Model({ name: "typed" });
+    await new Promise((r) => setImmediate(r));
+
+    expect(returned).toBe(schema);
+    expect(seen).toBe("typed");
+  });
+
+  it("still fires hooks registered with the raw hook name", async () => {
+    const schema = new mongoose.Schema({ name: String });
+    schema.plugin(constructHook);
+
+    let postCalled = false;
+    schema.post("construct" as any, function () {
+      postCalled = true;
+    });
+
+    const Model = mongoose.model("TestRawHookName", schema);
+    new Model({ name: "test" });
+    await new Promise((r) => setImmediate(r));
+
+    expect(postCalled).toBe(true);
   });
 });

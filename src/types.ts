@@ -1,10 +1,15 @@
-import type { Schema } from "mongoose";
+import type { HydratedDocumentFromSchema, Schema } from "mongoose";
 
 /**
- * Wide Schema alias used internally and in the module augmentation.
- * @internal
+ * Wide Schema alias accepted by the plugin.
+ * Only the leading type parameters are given, so it fits Mongoose 7, 8 and 9.
  */
-export type AnySchema = Schema<any, any, any, any, any, any, any, any, any, any, any>;
+export type AnySchema = Schema<any, any, any, any, any, any, any>;
+
+/**
+ * Document type that construct hooks registered on `S` receive.
+ */
+export type ConstructedDocument<S extends Schema> = HydratedDocumentFromSchema<S>;
 
 /**
  * Options for the constructHook plugin.
