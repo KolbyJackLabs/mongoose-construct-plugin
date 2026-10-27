@@ -1,6 +1,6 @@
 {
   "name": "mongoose-construct-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mongoose plugin: pre/post construct hooks that fire when documents are instantiated (new Model() or hydrated from DB)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
